@@ -1,0 +1,722 @@
+/* Agent One. Tokens read off typesafe.ai: ink #1e1e1e at 86% for display, paper #fefefe,
+   dark panels #1e1e1e, pink accent #f386a1, hairline rules at 10% black. Their display face is
+   Die Grotesk C Medium, which is licensed, so Inter Tight 500 stands in at the same very tight
+   leading (0.8 to 0.9) that gives their headlines their shape. Mono is their real JetBrains Mono.
+
+   The whole app is one screen. Nothing scrolls except the chat thread, because this is recorded
+   in a single take and a scrollbar mid-demo reads as a broken layout. Every row is sized in vh
+   or given min-height:0 so the browser pane takes whatever is left and never pushes the rail off
+   the bottom. */
+
+:root {
+  --paper: #fefefe;
+  --ink: #1e1e1e;
+  --ink-soft: rgba(30, 30, 30, 0.86);
+  --ink-mute: rgba(30, 30, 30, 0.5);
+  --ink-faint: rgba(30, 30, 30, 0.34);
+  --accent: #f386a1;
+  --rule: rgba(0, 0, 0, 0.1);
+  --grey: #c4c4c4;
+  --shade: #f2f2f0;
+  --done: #1e1e1e;
+
+  font-family: "Inter Tight", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Any author rule with a display value beats the user agent's [hidden] { display: none }, and
+   several here set display on elements that are toggled with the attribute. Settle it once. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  /* Both, not just body: with only body hidden the root still scrolls sideways. */
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.eyebrow,
+.tag,
+.meta,
+.live,
+.viewport-url,
+.viewport-foot,
+footer,
+.note,
+.rail-nodes small {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 300;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* ---------- header ---------- */
+
+header {
+  height: 46px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--rule);
+  flex: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--ink);
+}
+
+.mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--ink);
+  position: relative;
+}
+
+.mark::after {
+  content: "";
+  position: absolute;
+  inset: 3.5px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.meta .rule {
+  width: 1px;
+  height: 11px;
+  background: var(--rule);
+}
+
+.tag {
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.tag[data-phase="running"],
+.tag[data-phase="parsing"] {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.tag[data-phase="done"] {
+  border-color: transparent;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.tag[data-phase="error"],
+.tag[data-phase="waiting"] {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+/* ---------- layout ---------- */
+
+main {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 24px 0;
+  max-width: 1420px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lede {
+  flex: none;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: clamp(26px, 2.9vw, 40px);
+  font-weight: 500;
+  line-height: 0.84;
+  letter-spacing: -1.1px;
+  color: var(--ink-soft);
+}
+
+h1 .arrow {
+  color: var(--accent);
+  font-weight: 400;
+}
+
+.sub {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-mute);
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* ---------- browser pane ---------- */
+
+.viewport-frame {
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.viewport-bar {
+  height: 30px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: #262624;
+  flex: none;
+}
+
+.traffic {
+  display: flex;
+  gap: 5px;
+}
+
+.traffic b {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4a4a46;
+}
+
+.viewport-url {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.46);
+  text-transform: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.live {
+  color: rgba(255, 255, 255, 0.34);
+  letter-spacing: 1px;
+}
+
+.live[data-on="1"] {
+  color: var(--accent);
+}
+
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+#feed {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.viewport-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.36);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.viewport-empty p {
+  margin: 0;
+  font-size: 12.5px;
+  max-width: 34ch;
+}
+
+.crosshair {
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.viewport-foot {
+  height: 27px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #262624;
+  color: rgba(255, 255, 255, 0.42);
+  text-transform: none;
+  flex: none;
+}
+
+.viewport-foot span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- console ---------- */
+
+.console {
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--paper);
+}
+
+.clock {
+  padding: 12px 16px 9px;
+  border-bottom: 1px solid var(--rule);
+  flex: none;
+}
+
+.clock .eyebrow {
+  margin: 0 0 3px;
+}
+
+.readout {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 38px;
+  font-weight: 300;
+  letter-spacing: -1.4px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* Sit the thread on the input like a real chat, instead of stranding it under the clock. */
+.log > :first-child {
+  margin-top: auto;
+}
+
+.msg {
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 100%;
+}
+
+.msg .who {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: block;
+  margin-bottom: 3px;
+}
+
+.msg.you .bubble {
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 8px 8px 2px 8px;
+  padding: 8px 11px;
+  display: inline-block;
+}
+
+.msg.agent .bubble {
+  background: var(--shade);
+  border-radius: 8px 8px 8px 2px;
+  padding: 8px 11px;
+  display: inline-block;
+  color: var(--ink-soft);
+}
+
+.msg.you {
+  text-align: right;
+}
+
+form {
+  border-top: 1px solid var(--rule);
+  padding: 11px 16px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: none;
+}
+
+textarea {
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 9px 10px;
+  resize: none;
+  background: var(--paper);
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--ink-faint);
+}
+
+textarea::placeholder {
+  color: var(--ink-faint);
+}
+
+.send-row {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 9px 18px;
+  border: 1px solid transparent;
+  transition: opacity 0.15s ease;
+}
+
+button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.primary {
+  background: var(--ink);
+  color: var(--paper);
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.primary span {
+  font-size: 14px;
+}
+
+.ghost {
+  background: transparent;
+  border-color: var(--rule);
+  color: var(--ink-mute);
+}
+
+/* ---------- progress rail ---------- */
+
+.rail {
+  position: relative;
+  padding: 2px 0 0;
+  flex: none;
+}
+
+.rail-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 12px;
+  height: 1px;
+  background: var(--rule);
+}
+
+.rail-fill {
+  height: 100%;
+  width: 0;
+  background: var(--ink);
+  transition: width 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.rail-nodes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  position: relative;
+}
+
+.rail-nodes li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+  padding: 0 4px;
+}
+
+.dot {
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  border: 1px solid var(--grey);
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  color: var(--ink-faint);
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease;
+}
+
+.rail-nodes li[data-status="active"] .dot {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--ink);
+  transform: scale(1.14);
+}
+
+.rail-nodes li[data-status="done"] .dot {
+  border-color: transparent;
+  background: var(--done);
+  color: var(--paper);
+}
+
+.rail-nodes small {
+  line-height: 1.25;
+  max-width: 13ch;
+  text-transform: none;
+  letter-spacing: 0.2px;
+}
+
+.rail-nodes li[data-status="done"] small,
+.rail-nodes li[data-status="active"] small {
+  color: var(--ink-soft);
+}
+
+/* ---------- footer ---------- */
+
+footer {
+  flex: none;
+  margin-top: 12px;
+  padding: 9px 24px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.stats {
+  display: flex;
+  gap: 26px;
+}
+
+.stats > div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.stats strong {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.note {
+  margin-left: auto;
+}
+
+#error {
+  flex: none;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 9px 13px;
+  font-size: 12.5px;
+  color: var(--ink);
+  background: rgba(243, 134, 161, 0.12);
+}
+
+@media (max-height: 760px) {
+  .sub {
+    display: none;
+  }
+  .rail-nodes small {
+    display: none;
+  }
+}
+
+/* ---------- footer controls and the log drawer ---------- */
+
+.footer-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.linkish {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.linkish:hover {
+  color: var(--ink);
+}
+
+/* Floats over the layout rather than sitting in it, so opening it never makes the page scroll. */
+.logs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 37px;
+  max-height: 46vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+  box-shadow: 0 -14px 34px rgba(0, 0, 0, 0.09);
+  z-index: 20;
+}
+
+.logs-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--rule);
+  flex: none;
+}
+
+.logs-totals {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.logs-totals b {
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.logs-head .linkish:last-child {
+  margin-left: auto;
+}
+
+.logs-body {
+  overflow-y: auto;
+  padding: 6px 24px 12px;
+  min-height: 0;
+}
+
+.logrow {
+  display: grid;
+  grid-template-columns: 52px 46px minmax(0, 1fr) 62px 42px;
+  gap: 12px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.log-t,
+.log-ms,
+.log-conf {
+  color: var(--ink-mute);
+}
+
+.log-ms,
+.log-conf {
+  text-align: right;
+}
+
+.log-who {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  border-radius: 3px;
+  padding: 1px 0;
+  text-align: center;
+  color: var(--ink);
+}
+
+.logrow[data-who="jev"] .log-who {
+  background: var(--accent);
+}
+
+.logrow[data-who="llm"] .log-who {
+  background: var(--shade);
+  color: var(--ink-mute);
+}
+
+.log-what {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: "Inter Tight", system-ui, sans-serif;
+  font-size: 12.5px;
+}

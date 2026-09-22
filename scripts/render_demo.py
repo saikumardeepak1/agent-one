@@ -35,9 +35,9 @@ def mono(n):
 ink, muted, green = "#172a20", "#6a766c", "#2a743f"
 steps = [
     ("One way", "One way"),
-    ("Zürich", "Zürich, Switzerland"),
-    ("London", "London, United Kingdom"),
-    ("20 September", "Done. Search"),
+    ("Portland", "Portland, OR, USA"),
+    ("San Francisco", "San Francisco, CA, USA"),
+    ("15 October", "Done. Search"),
     ("Search flights", "Search"),
 ]
 for i in range(round((end + 500) * 30 / 1000)):
@@ -49,7 +49,7 @@ for i in range(round((end + 500) * 30 / 1000)):
     d.text((186, 27), "×  TypeSafe", font=font(22), fill=muted)
     d.rounded_rectangle((1287, 24, 1499, 59), radius=17, fill="#dfebd9")
     d.text((1310, 32), "REAL WEB  ·  1× SPEED", font=font(14, True), fill=green)
-    d.text((36, 80), f"Zürich → London. In {end / 1000:.1f} seconds.", font=font(43, True), fill=ink)
+    d.text((36, 80), f"Portland → San Francisco. In {end / 1000:.1f} seconds.", font=font(43, True), fill=ink)
     d.text((38, 139), "One goal. Dynamic elements. LLM-generated text.", font=font(20), fill=muted)
     d.rounded_rectangle((35, 191, 1157, 943), radius=14, fill="#202124")
     for j, c in enumerate(["#de8278", "#d6bd6e", "#8dbd8a"]):

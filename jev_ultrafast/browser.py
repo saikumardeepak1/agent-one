@@ -7,6 +7,8 @@ import time
 from pathlib import Path
 
 from browser_harness.admin import ensure_daemon
+
+from .tab import VIEW_HEIGHT, VIEW_WIDTH
 from browser_harness.helpers import cdp
 
 # Atomically read visible content and controls, preserving actual DOM node identity.
@@ -20,9 +22,13 @@ class StalePage(ValueError):
 class Browser:
     def __init__(self, url):
         ensure_daemon()
-        self.target = cdp("Target.createTarget", url="about:blank", background=True)["targetId"]
+        # Its own window, so the demo can minimise the driven tab without hiding anything else the
+        # person has open in this browser, such as the Agent One page itself.
+        self.target = cdp(
+            "Target.createTarget", url="about:blank", background=True, newWindow=True
+        )["targetId"]
         self.session = cdp("Target.attachToTarget", targetId=self.target, flatten=True)["sessionId"]
-        self.call("Emulation.setDeviceMetricsOverride", width=1120, height=780, deviceScaleFactor=1, mobile=False)
+        self.call("Emulation.setDeviceMetricsOverride", width=VIEW_WIDTH, height=VIEW_HEIGHT, deviceScaleFactor=1, mobile=False)
         # Keep rAF/menus rendering in an owned background tab, without activating the user's Chrome tab.
         self.call("Emulation.setFocusEmulationEnabled", enabled=True)
         self.call("Page.navigate", url=url)
@@ -31,6 +37,14 @@ class Browser:
             if self.evaluate("document.readyState") == "complete":
                 break
             time.sleep(0.02)
+
+    def adopt(self, target_id):
+        """Follow a handoff into another tab, e.g. the airline page Google opens on Continue."""
+        self.target = target_id
+        self.session = cdp("Target.attachToTarget", targetId=target_id, flatten=True)["sessionId"]
+        self.call("Emulation.setDeviceMetricsOverride", width=VIEW_WIDTH, height=VIEW_HEIGHT, deviceScaleFactor=1, mobile=False)
+        self.call("Emulation.setFocusEmulationEnabled", enabled=True)
+        self.after_input = None
 
     def call(self, method, **params):
         return cdp(method, session_id=self.session, **params)
@@ -148,7 +162,17 @@ def browser_operation(request):
               if (action.kind==='fill' && (e.readOnly || e.getAttribute('aria-readonly')==='true')) return null;
               const r=e.getBoundingClientRect(), x=r.x+r.width/2, y=r.y+r.height/2;
               if (!r.width || !r.height || x<0 || y<0 || x>=innerWidth || y>=innerHeight) return null;
-              if (!e.contains(document.elementFromPoint(x,y))) return null;
+              const hit=document.elementFromPoint(x,y);
+              if (!e.contains(hit)) {
+                // Some sites paint a sibling layer over the semantic control. Google Flights result rows
+                // do this, so elementFromPoint returns a label drawn inside the row rather than the row's
+                // own role=link node. Accept a cover only when it sits entirely inside the target's box:
+                // a banner, dialog or consent overlay extends past the target and is still rejected.
+                const h=hit?.getBoundingClientRect();
+                if (!h || h.left<r.left-1 || h.top<r.top-1 || h.right>r.right+1 || h.bottom>r.bottom+1) return null;
+                const modal='[role="dialog"],[aria-modal="true"]';
+                if (hit.closest(modal) !== e.closest(modal)) return null;
+              }
               if (action.kind==='select') {
                 if (e.tagName!=='SELECT' || ![...e.options].some(o=>o.value===action.value &&
                     !o.disabled && !o.closest('optgroup[disabled]'))) return null;
@@ -164,6 +188,11 @@ def browser_operation(request):
                 raise StalePage("Target changed or is covered. Observe again.")
             if kind != "select":
                 x, y = target["x"], target["y"]
+                # Move before pressing. Google Flights result rows are hover-gated: with no pointer
+                # ever moved onto them, the press and release land but the row never navigates, so
+                # the agent reads an unchanged page and gives up on a click that looked fine.
+                # Puppeteer and Playwright both move first for this reason.
+                call("Input.dispatchMouseEvent", type="mouseMoved", x=x, y=y)
                 for event in ("mousePressed", "mouseReleased"):
                     call("Input.dispatchMouseEvent", type=event, x=x, y=y, button="left", clickCount=1)
                 if kind == "fill":

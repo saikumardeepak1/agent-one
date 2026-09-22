@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="demo-token" content="__TOKEN__" />
+    <title>Agent One</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@300;400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/agent.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        AGENT ONE
+      </div>
+      <div class="meta">
+        <span class="tag" id="phase">IDLE</span>
+        <span class="rule" aria-hidden="true"></span>
+        <span>JEV V13 &nbsp;SYSTEM ONE</span>
+        <span class="rule" aria-hidden="true"></span>
+        <span>ONE TOOL &nbsp;/ &nbsp;FLIGHTS</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="lede">
+        <h1 id="headline">One sentence.<br />One seat.</h1>
+        <p class="sub" id="subline">
+          Jev reads the request and chooses every move. A small model only writes the words.
+        </p>
+      </section>
+
+      <div id="error" role="alert" hidden></div>
+
+      <section class="workspace">
+        <div class="viewport-frame">
+          <div class="viewport-bar">
+            <div class="traffic" aria-hidden="true"><b></b><b></b><b></b></div>
+            <span class="viewport-url" id="viewport-url">brave &nbsp;· &nbsp;offscreen &nbsp;· &nbsp;driven by jev</span>
+            <span class="live" id="live-tag">IDLE</span>
+          </div>
+          <div class="viewport" id="viewport">
+            <img id="feed" alt="Live view of the browser being driven" hidden />
+            <div class="viewport-empty" id="viewport-empty">
+              <span class="crosshair" aria-hidden="true">&#8853;</span>
+              <p>The browser appears here the moment a task starts.</p>
+            </div>
+          </div>
+          <div class="viewport-foot">
+            <span id="last-action">No action yet</span>
+            <span id="last-probability"></span>
+          </div>
+        </div>
+
+        <aside class="console">
+          <div class="clock">
+            <p class="eyebrow">SECONDS ELAPSED</p>
+            <div class="readout" id="clock">00.00</div>
+          </div>
+
+          <div class="log" id="log"></div>
+
+          <form id="task-form" autocomplete="off">
+            <label class="eyebrow" for="command">YOUR REQUEST</label>
+            <textarea
+              id="command"
+              rows="2"
+              placeholder="Book the cheapest one-way flight from Portland to Seattle on October 13"
+            ></textarea>
+            <div class="send-row">
+              <button type="submit" id="send" class="primary">Book it <span>&#8599;</span></button>
+              <button type="button" id="stop" class="ghost" hidden>Stop</button>
+            </div>
+          </form>
+        </aside>
+      </section>
+
+      <section class="rail" aria-label="Progress">
+        <div class="rail-track"><div class="rail-fill" id="rail-fill"></div></div>
+        <ol class="rail-nodes" id="rail"></ol>
+      </section>
+    </main>
+
+    <footer>
+      <div class="stats" id="stats" hidden>
+        <div><span class="eyebrow">ACTIONS</span><strong id="s-actions">0</strong></div>
+        <div><span class="eyebrow">JEV DECISIONS</span><strong id="s-decisions">0</strong></div>
+        <div><span class="eyebrow">MEDIAN</span><strong id="s-median">0 ms</strong></div>
+        <div><span class="eyebrow">TEXT CALLS</span><strong id="s-text">0</strong></div>
+        <div><span class="eyebrow">COST</span><strong id="s-cost">$0.0000</strong></div>
+      </div>
+      <div class="footer-right">
+        <button type="button" id="open-browser" class="linkish">Open the browser &#8599;</button>
+        <button type="button" id="logs-toggle" class="linkish" aria-expanded="false">
+          <span id="logs-caret">&#9656;</span> Logs
+        </button>
+      </div>
+    </footer>
+
+    <section class="logs" id="logs" hidden aria-label="Decision log">
+      <div class="logs-head">
+        <span class="eyebrow">DECISION LOG</span>
+        <div class="logs-totals" id="logs-totals"></div>
+        <button type="button" id="logs-close" class="linkish">Close</button>
+      </div>
+      <div class="logs-body" id="logs-body"></div>
+    </section>
+
+    <script type="module" src="/agent.js"></script>
+  </body>
+</html>

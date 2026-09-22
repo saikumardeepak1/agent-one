@@ -1,142 +1,165 @@
-<img src="docs/banner.svg" alt="Jev Ultrafast · Browser Use × TypeSafe" width="100%" />
+# Agent One
 
-# Jev Ultrafast ⚡
+**A browser agent that books a flight from one sentence, with [TypeSafe's Jev](https://docs.typesafe.ai/introduction) making every bounded decision.**
 
-> [!IMPORTANT]
-> **The Browser Use Cloud waitlist is open.** Get early access to ultrafast browser agents in the cloud.
-> **[Join the waitlist →](https://browser-use.com/ultrafast?utm_source=github&utm_medium=readme&utm_campaign=jev-ultrafast)**
+You type `book the cheapest flight from Portland to Denver on March 3`. Agent One routes the intent, opens Google Flights in a real browser, reads the fare table, picks the cheapest option out of twelve, and stops on the airline's passenger-details page. Measured end to end: **12.88 seconds**, of which **4.02 seconds** was the agent thinking and **8.86 seconds** was waiting for Google and Frontier to paint.
 
-**A browser agent with a dynamic, indexed action space.**
-
-Give it one goal. [TypeSafe's Jev](https://docs.typesafe.ai/introduction) picks an operation and an element. A small LLM writes text only when the operation is `TYPE_TEXT`.
-
-**Zürich → London on Google Flights in 7.1 seconds.** One natural-language goal, actual text generation, and loading waits included.
-
-<a href="docs/demo.mp4"><img src="docs/demo.gif" alt="A real Google Flights search at 1× speed, with generated city names and dynamic operation/target decisions" width="100%" /></a>
-
-[Watch the MP4](docs/demo.mp4) · [Measurements](docs/performance.md) · [Read the loop](jev_ultrafast/agent.py)
-
-## The action space
-
-Every observation produces a new element table:
-
-```text
-[1] button    Change ticket type · Round trip
-[2] combobox  Where from?        · San Francisco
-[3] combobox  Where to?          · empty
-[4] textbox   Departure          · empty
-...
-```
-
-The operations are `CLICK`, `TYPE_TEXT`, `SELECT`, `SCROLL_UP`, `SCROLL_DOWN`, `WAIT`, `DONE`, and `BLOCKED`. Only supported operations and targets are offered.
-
-```text
-                      one TypeSafe request
-                     ┌───────────────────────────┐
-page → element table → operation                 │
-                     │ click_target              │
-                     │ type_text_target          │
-                     │ select_target, if present │
-                     └─────────────┬─────────────┘
-                         use the matching target
-                                   │
-                    CLICK [7] ─────┤──→ browser
-                TYPE_TEXT [3] ─────┘
-                          ↓
-                   small LLM → text → browser
-```
-
-Target questions are speculative. If the operation is `CLICK`, only `click_target` can execute. Two decisions, **one network round trip**. Each target head contains only compatible elements. Native dropdown choices carry an observed element/option index.
-
-There are no site-specific action scripts or prepared field strings in the policy. The Flights example supplies a goal and independently verifies the outcome. The screenshot renderer adds labels afterward; it does not drive the browser.
-
-## Try it
-
-```bash
-git clone https://github.com/browser-use/jev-ultrafast.git
-cd jev-ultrafast
-uv sync
-cp .env.example .env
-# Add TYPESAFE_API_KEY and TEXT_MODEL_API_KEY.
-uv run jev
-```
-
-Open **http://127.0.0.1:8766** and click **Start demo → Run automatically**. The inspector shows numbered elements, operation probabilities, target probabilities, and executed actions. **Choose next** pauses before execution.
-
-Chrome connects through [Browser Harness](https://github.com/browser-use/browser-harness), installed by `uv sync`. Run `uv run browser-harness --doctor` if it needs connecting. Allow remote debugging in Chrome when prompted.
-
-`TEXT_MODEL_API_KEY` is an OpenRouter key in the example configuration. The current demo uses `inception/mercury-2.5` with reasoning disabled. Gemini, GLM, and DeepSeek can also use the OpenAI-compatible text helper; configure the appropriate model, endpoint, and reasoning setting.
-
-## Use the library
-
-```python
-from jev_ultrafast import Agent
-
-with Agent(
-    "https://www.google.com/travel/flights?hl=en",
-    "Find one-way flights from Zurich to London on September 20, 2026, "
-    "for one adult in economy. Stop when matching flight options are visible.",
-) as agent:
-    for state in agent.run():
-        print(state["elapsed_ms"], state["status"])
-```
-
-Run with `uv run --env-file .env python your_script.py`. The same policy can run a different task:
-
-```bash
-uv run --env-file .env python examples/run.py \
-  --url https://en.wikipedia.org/wiki/Main_Page \
-  --goal 'Find and open the Wikipedia article about Gödel’s incompleteness theorems.'
-```
-
-`uv run --env-file .env python examples/flights.py --keep-open` performs the flight search, checks the actual route/date/results, and saves its trace. It does not select or book a flight.
-
-## Why it moves
-
-- **One request per decision cycle.** Operation and target heads share the same observed state.
-- **No screenshots in the default agent loop.** Jev consumes structured state. The inspector opts into screenshots; the video uses a separate continuous screencast.
-- **One browser call per snapshot.** Read visible controls, their names, values, and text atomically. Keep references to the actual DOM nodes.
-- **Validate the selected target.** Clicks check the document, form values, target, and nearby context. Animation alone does not force another prediction. Resolve current geometry and reject covered controls before input.
-- **Wait for useful state.** After typing into a combobox, wait for visible suggestions, capped at 200 ms. Other interactions get at most two animation frames or 50 ms. These reads happen after execution is logged.
-- **Keep hidden tabs rendering.** Focus emulation prevents background animation throttling without switching Chrome's visible tab.
-- **Send visible text.** Offscreen article bodies and footers do not fill the model context.
-- **Reuse an interrupted text request.** A generated value survives a stale-page retry only if the entire text-helper input is unchanged.
-
-Every executed target is resolved from an observed node. The executor rechecks page freshness and click occlusion. Model output never becomes selectors, coordinates, shell commands, or executable JavaScript. Text-helper output must parse as a small JSON object before typing.
-
-## Small enough to read
-
-| File | Job |
-| --- | --- |
-| [agent.py](jev_ultrafast/agent.py) | The complete loop and text-helper handoff |
-| [snapshot.js](jev_ultrafast/snapshot.js) | Atomic DOM snapshot, indexed controls, freshness guards |
-| [browser.py](jev_ultrafast/browser.py) | Browser connection, current geometry, execution |
-| [model.py](jev_ultrafast/model.py) | Dynamic operation/target heads and text generation |
-| [questions.py](jev_ultrafast/questions.py) | Model instructions |
-| [demo.py](jev_ultrafast/demo.py) | Local inspector |
-
-## Evidence and limits
-
-The current video is a **7,073 ms** Google Flights run. Timing starts after initial page observation and includes model calls, generated text, browser work, stale decisions, and loading waits. A fresh independent check verifies the one-way setting, Zürich, London, September 20, 2026, and visible flight options. The video plays at 1×, with no opening hold and a 0.5-second final hold.
-
-In six alternating runs with identical models and settings, both versions passed **3/3**. Median task time went from **9.450 s → 7.092 s**, a **25% reduction**; median browser protocol calls went from **1,092 → 101**. This is three repeats of one task on one browser profile, not a general reliability benchmark.
-
-The same policy opened the requested Wikipedia article in **2.798 s** and passed a local hotel search/filter task in **1.896 s**. Runs, failures, source hashes, and measurement boundaries are in [performance.md](docs/performance.md).
-
-A `DONE` choice still requires independent outcome verification. The DOM reader handles common HTML and ARIA controls, not the full accessible-name specification. Shadow roots, frames, canvas, uploads, pop-up tabs, nested scrolling, and arbitrary keyboard widgets remain outside this MVP. Owned tabs share the existing Chrome profile.
-
-## Development
-
-```bash
-uv run ruff check .
-uv run pytest
-node --check jev_ultrafast/static/app.js
-node --check jev_ultrafast/snapshot.js
-uv build
-```
-
-Tests are offline. `uv run python scripts/check_guards.py` checks real controls in a local browser without model calls. Live examples and recording scripts make paid API calls. `scripts/record_flights.py <new-folder>` captures original browser timestamps; `scripts/render_demo.py <recording-folder>` renders that verified run at 1× and crops out the Google account strip. Credentials and raw traces stay ignored.
+<a href="docs/demo.mp4"><img src="docs/demo.gif" alt="A real Google Flights booking at 1x speed" width="100%" /></a>
 
 ---
 
-[Browser Use](https://github.com/browser-use/browser-use) · [Browser Harness](https://github.com/browser-use/browser-harness) · [TypeSafe speculative fan-out](https://docs.typesafe.ai/patterns/fan-out)
+## Why this exists
+
+Most browser agents are slow for one reason: the model talks to itself. It proposes an action, the harness validates it, the action was malformed or referred to an element that isn't there, so it asks again. That loop is where the seconds go, and no amount of prompt tuning removes it, because the model is being asked to be right about something it cannot be reliably right about.
+
+Agent One splits the work by what each layer can actually be correct about.
+
+```
+  "book the cheapest flight from Portland to Denver on March 3"
+            │
+   ┌────────▼─────────┐
+   │  JEV  (decide)   │   bounded choices over a fixed option set
+   │                  │   6 heads, 1 request, ~150 ms warm:
+   │                  │   tool · priority · readiness · date · party · trip_type
+   └────────┬─────────┘
+            │  routed intent + calibrated confidence
+   ┌────────▼─────────┐
+   │  LLM  (write)    │   the one thing Jev cannot do:
+   │                  │   "Portland" → PDX, "March 3" → 2026-03-03
+   └────────┬─────────┘
+            │  concrete strings
+   ┌────────▼─────────┐
+   │  CODE  (act)     │   CDP: navigate, type, scroll, click
+   │                  │   never a model's job
+   └────────┬─────────┘
+            │  12 fare rows, read as numbers
+   ┌────────▼─────────┐
+   │  JEV  (decide)   │   one Choice over structured fares
+   └──────────────────┘   → $132 Alaska, 1 stop
+```
+
+Jev gets closed-set decisions where the option list is known and being wrong is expensive. The small text model gets open-ended string production, which is all it is for. Deterministic code does the scrolling and clicking. Nothing retries on malformed JSON, because nothing is asked to produce JSON it could get wrong.
+
+### The fan-out is free
+
+Routing asks six questions in one request:
+
+```python
+QUESTIONS = (
+    ("tool",      TOOLS),       # book_flight | unclear
+    ("priority",  PRIORITY),    # cheapest | fastest | balanced
+    ("readiness", READINESS),   # ready | needs_origin | needs_destination | needs_both
+    ("date",      DATE),        # given | absent
+    ("party",     PARTY),       # 1..6
+    ("trip_type", TRIP_TYPE),   # one_way | round_trip
+)
+```
+
+Six questions cost what one costs, because the bill is for the state and the state is one sentence. A conventional harness makes this six calls, or one call with a large JSON schema and a parse step that can fail.
+
+### Confidence is a control signal, not decoration
+
+Jev returns calibrated confidence. When `readiness` comes back low, Agent One asks *"Which city are you starting from?"* instead of guessing Portland because Portland appears often in training data. See [`missing_piece()`](jev_ultrafast/router.py).
+
+### Picking the cheapest fare is a shaped question, not a prompt trick
+
+The naive approach hands the model the whole page and asks it to click the best flight. That fails on Google Flights, because the cheapest fare usually sits under *Other flights*, roughly a thousand pixels below the fold, and an honest answer to "which of these can I click" excludes the row that wins.
+
+So [`picker.py`](jev_ultrafast/picker.py) reads the result rows itself, turns them into numbers, and hands Jev a short choice over structured options:
+
+```json
+{"price_usd": 132, "total_minutes": 224, "stops": "1 stop", "airline": "Alaska", "departs": "6:00 AM"}
+```
+
+Jev still decides. It is simply being asked something a decision model can be right about. The code does the scrolling and the clicking, which was never the model's job.
+
+---
+
+## Measured
+
+Two live runs, wall clock, nothing trimmed:
+
+| Run | Result | Time | Steps |
+|---|---|---|---|
+| PDX → SEA, 1 adult, one way | Jev picked $132 from 12 fares | **11.59 s** | 9/9 |
+| PDX → DEN, 2 adults, one way | Stopped on Frontier passenger info, $268 | **12.88 s** | 9/9 |
+
+The log drawer in the UI breaks down every run:
+
+```
+16 JEV CALLS 2.23S  |  3 MODEL CALLS 1.79S  |  WAITING ON THE WEB 8.86S  |  TOTAL 12.88S
+```
+
+That last column is the honest one. Wall clock swings between 11.6 s and 19.4 s depending entirely on how fast Google and the airline respond. The part Agent One controls is the 4 seconds of decisions, and warm those run at 133 to 200 ms for routing and 400 to 500 ms for the text model.
+
+---
+
+## Running it
+
+You need macOS, [Brave](https://brave.com/), [uv](https://docs.astral.sh/uv/), a TypeSafe API key (currently early access), and any OpenAI-compatible text model key.
+
+```bash
+git clone https://github.com/saikumardeepak1/agent-one.git
+cd agent-one
+uv sync
+cp .env.example .env     # fill in the two keys, see below
+./run-agent.sh
+```
+
+Open **http://127.0.0.1:8767** and type a sentence. Stop everything with `./stop.sh`.
+
+### Keys
+
+Both keys live in `.env`, which is gitignored and never committed:
+
+```bash
+TYPESAFE_API_KEY=your_typesafe_key
+TYPESAFE_MODEL=jev-latest
+
+TEXT_MODEL_API_KEY=your_groq_or_openrouter_key
+TEXT_MODEL_BASE_URL=https://api.groq.com/openai/v1
+TEXT_MODEL=openai/gpt-oss-20b
+TEXT_MODEL_REASONING=omit
+```
+
+`TEXT_MODEL_REASONING=omit` matters for Groq, which returns a 400 on unknown request fields.
+
+### About the browser
+
+`run-agent.sh` starts Brave on a throwaway profile at `/tmp/brave-jev-profile` with remote debugging on port 9222. It does not touch your own browser profile, and remote debugging is never enabled on it.
+
+One macOS quirk: while the demo is running, clicking Brave in the Dock may surface the blank throwaway profile, because macOS hands the Dock icon to whichever Brave started first. Your real profile is untouched. `./stop.sh` gives it back.
+
+---
+
+## Layout
+
+| File | What it does |
+|---|---|
+| [`router.py`](jev_ultrafast/router.py) | Jev routes the sentence. Six heads, one request. |
+| [`picker.py`](jev_ultrafast/picker.py) | Reads fare rows as numbers, lets Jev choose one, clicks it. |
+| [`harness.py`](jev_ultrafast/harness.py) | The app server, state machine, and step timeline. |
+| [`browser.py`](jev_ultrafast/browser.py) | CDP driving: navigate, type, click. |
+| [`tab.py`](jev_ultrafast/tab.py) | Short-lived CDP sessions that never queue behind the agent. |
+| [`screencast.py`](jev_ultrafast/screencast.py) | MJPEG frames from the driven tab, read-only. |
+| [`model.py`](jev_ultrafast/model.py) | The TypeSafe and text-model transports, with retry. |
+
+```bash
+uv run pytest        # 31 tests
+```
+
+---
+
+## Known limits
+
+- **It is one tool.** `TOOLS` holds `book_flight` and `unclear`. The routing layer is shaped for more; right now only one is loaded.
+- **The fragile part is the selectors, not the models.** `picker.py` parses `From 132 US dollars. 1 stop flight with Alaska...` out of an aria-label. If Google changes that string, fare selection stops working. This is the opposite of what people usually assume breaks.
+- **It stops at passenger details on purpose.** Agent One holds a seat up to the point where real personal data would be entered. It does not fill in names, it does not pay, and it never will.
+
+---
+
+## Credit
+
+Built on [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast), which contributed the CDP driving loop and the indexed action space. The agent harness, Jev routing, fare picker, live UI, and timeline are this project's own.
+
+MIT, same as upstream.

@@ -10,6 +10,7 @@ import httpx
 from .questions import NEXT_ACTION, TARGET, TEXT_VALUE
 
 CLIENT = httpx.Client(http2=True, timeout=25)
+SYSTEM_ONE = "https://api.typesafe.ai/v1/systemone"
 
 
 def post_json(url, key, body):
@@ -17,12 +18,21 @@ def post_json(url, key, body):
         try:
             response = CLIENT.post(url, json=body, headers={"Authorization": f"Bearer {key}"})
         except httpx.HTTPError:
+            # A pooled connection the provider has already closed fails on first use, which is a
+            # dead socket rather than a dead service. Retrying gets a new one; giving up here cost
+            # a whole demo run.
+            if attempt < 2:
+                time.sleep(0.25 * 2**attempt)
+                continue
             raise RuntimeError("Model connection failed; no action executed.") from None
         if response.status_code in {429, 529, 503} and attempt < 2:
             time.sleep(0.5 * 2**attempt)
             continue
         if response.is_error:
-            raise RuntimeError(f"Model provider returned HTTP {response.status_code}; no action executed.")
+            detail = response.text[:220].replace("\n", " ")
+            raise RuntimeError(
+                f"Model provider returned HTTP {response.status_code}: {detail}; no action executed."
+            )
         return response.json()
     raise RuntimeError("Model unavailable")
 
@@ -36,12 +46,24 @@ def validate_choice(answer, ids):
             and set(probabilities) == set(ids)
             and all(type(n) in (int, float) and math.isfinite(n) and 0 <= n <= 1 for n in numbers)
             and abs(sum(probabilities.values()) - 1) < 0.02
-            and probabilities[answer["choice"]] >= max(probabilities.values()) - 1e-6
+            # Probabilities come back rounded, so on a wide flat distribution the reported
+            # argmax can differ from the server's full-precision pick by a rounding step.
+            # Same 0.02 tolerance the sum check above already uses.
+            and probabilities[answer["choice"]] >= max(probabilities.values()) - 0.02
         )
-    except (KeyError, TypeError, ValueError):
-        valid = False
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"Invalid TypeSafe response ({type(error).__name__}); no action executed.") from None
     if not valid:
-        raise ValueError("Invalid TypeSafe response; no action executed.")
+        chosen, keys, total = answer.get("choice"), set(probabilities), sum(probabilities.values())
+        if chosen not in ids:
+            why = "choice not offered"
+        elif keys != set(ids):
+            why = f"option set differs by {sorted(keys ^ set(ids))[:4]}"
+        elif abs(total - 1) >= 0.02:
+            why = f"probabilities sum to {total:.3f}"
+        else:
+            why = "chosen option is not the argmax"
+        raise ValueError(f"Invalid TypeSafe response: {why}; no action executed.")
     return answer
 
 
@@ -116,7 +138,7 @@ def choose(state, goal, history):
         "questions": questions,
     }
     started = time.perf_counter()
-    result = post_json("https://api.typesafe.ai/v1/systemone", os.environ["TYPESAFE_API_KEY"], body)
+    result = post_json(SYSTEM_ONE, os.environ["TYPESAFE_API_KEY"], body)
     operation_answer = validate_choice(result["answers"].get("operation", {}), operations)
     operation = operation_answer["choice"]
     target = None
@@ -164,8 +186,12 @@ def field_text(context):
     base = os.environ.get("TEXT_MODEL_BASE_URL", "https://api.deepseek.com/v1").rstrip("/")
     model = os.environ.get("TEXT_MODEL", "deepseek-chat")
     reasoning = {"thinking": {"type": "disabled"}} if "api.deepseek.com/" in base else {"reasoning": {"effort": "low"}}
-    if os.environ.get("TEXT_MODEL_REASONING") == "none":
+    setting = os.environ.get("TEXT_MODEL_REASONING")
+    if setting == "none":
         reasoning = {"reasoning": {"enabled": False}}
+    elif setting == "omit":
+        # Groq and Gemini reject unknown request fields with a 400, so send no reasoning key at all.
+        reasoning = {}
     started = time.perf_counter()
     result = post_json(
         base + "/chat/completions",
