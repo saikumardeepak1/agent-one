@@ -4,7 +4,10 @@
 
 You type `book the cheapest flight from Portland to Denver on March 3`. Agent One routes the intent, opens Google Flights in a real browser, reads the fare table, picks the cheapest option out of twelve, and stops on the airline's passenger-details page. Measured end to end: **12.88 seconds**, of which **4.02 seconds** was the agent thinking and **8.86 seconds** was waiting for Google and Frontier to paint.
 
-<a href="docs/demo.mp4"><img src="docs/demo.gif" alt="A real Google Flights booking at 1x speed" width="100%" /></a>
+> [!NOTE]
+> A recording of an Agent One run is not in this repo yet. The `docs/demo.*` files belong to
+> upstream and show a different project, so they are deliberately not shown here.
+
 
 ---
 

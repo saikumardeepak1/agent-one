@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agent One</title>
+<meta name="description" content="A browser agent that books a flight from one sentence. TypeSafe Jev makes every bounded decision, a small text model only writes strings, and code does the clicking." />
+<meta property="og:title" content="Agent One" />
+<meta property="og:description" content="Books a flight from one sentence in 12.88 seconds, of which 4 seconds is the agent thinking." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0B0B0D;
+    --surface: #141417;
+    --surface-raised: #1C1C21;
+    --border: #26262C;
+    --text: #EDEDEF;
+    --text-muted: #8A8A93;
+    --accent: #E4E4E7;
+    --sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ---------- type ---------- */
+
+  h1 {
+    font-size: 48px;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    font-weight: 600;
+    margin: 0 0 20px;
+  }
+
+  h2 {
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0 0 8px;
+  }
+
+  p { margin: 0 0 16px; max-width: 68ch; }
+
+  .lede { font-size: 20px; color: var(--text-muted); letter-spacing: -0.01em; }
+
+  .label {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .muted { color: var(--text-muted); }
+
+  code, .num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  code {
+    font-size: 0.9em;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1px 5px;
+  }
+
+  a { color: var(--text); text-decoration-color: var(--border); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--accent); }
+
+  /* ---------- sections ---------- */
+
+  section { padding: 64px 0; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: 0; }
+
+  header.hero { padding: 96px 0 64px; }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .dot {
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--accent);
+  }
+
+  /* ---------- buttons ---------- */
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+
+  .btn {
+    display: inline-block;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+  .btn-primary { background: var(--accent); color: #0B0B0D; border-color: var(--accent); }
+  .btn-primary:hover { background: #fff; }
+  .btn-ghost { background: transparent; color: var(--text); }
+  .btn-ghost:hover { background: var(--surface); border-color: #35353D; }
+
+  /* ---------- video ---------- */
+
+  figure { margin: 0; }
+
+  .frame {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+    line-height: 0;
+  }
+  .frame video { width: 100%; height: auto; display: block; }
+
+  figcaption {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  /* ---------- metrics ---------- */
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 32px 0 8px;
+  }
+
+  .metric { background: var(--surface); padding: 20px 18px; }
+
+  .metric .v {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .metric .k {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+  }
+
+  /* ---------- bar ---------- */
+
+  .bar {
+    display: flex;
+    height: 32px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin: 24px 0 12px;
+  }
+  .bar span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .seg-jev  { background: var(--accent); color: #0B0B0D; }
+  .seg-llm  { background: #57575F; color: var(--text); }
+  .seg-wait { background: var(--surface); color: var(--text-muted); }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 20px;
+    font-family: var(--mono); font-size: 12px; color: var(--text-muted);
+  }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
+
+  /* ---------- diagram ---------- */
+
+  .layers { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 32px 0; }
+  .layer { background: var(--surface); padding: 20px; display: grid; grid-template-columns: 96px 1fr; gap: 20px; align-items: start; }
+  .layer .who { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); padding-top: 2px; }
+  .layer.hi { background: var(--surface-raised); }
+  .layer.hi .who { color: var(--accent); }
+  .layer p { margin: 0; font-size: 14px; }
+  .layer p + p { margin-top: 6px; color: var(--text-muted); }
+
+  /* ---------- table ---------- */
+
+  table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  th { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); font-weight: 500; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---------- pre ---------- */
+
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    margin: 24px 0;
+  }
+
+  ul { padding-left: 20px; max-width: 68ch; }
+  li { margin-bottom: 10px; }
+
+  footer { padding: 48px 0 80px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 14px; }
+
+  @media (max-width: 720px) {
+    h1 { font-size: 32px; }
+    .lede { font-size: 17px; }
+    header.hero { padding: 64px 0 48px; }
+    section { padding: 48px 0; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .layer { grid-template-columns: 1fr; gap: 8px; }
+    .bar span { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow"><span class="dot"></span><span class="label">Agent One</span></div>
+    <h1>One sentence.<br />One seat.</h1>
+    <p class="lede">
+      A browser agent that books a flight from a single line of plain English. TypeSafe's Jev makes every
+      bounded decision, a small text model writes only the strings Jev cannot produce, and ordinary code
+      does the scrolling and clicking.
+    </p>
+    <div class="actions">
+      <a class="btn btn-primary" href="https://github.com/saikumardeepak1/agent-one">View the code</a>
+      <a class="btn btn-ghost" href="#how">How it works</a>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <!-- Recording slot. Drop an Agent One run at site/demo.mp4 with a first-frame
+         poster at site/poster.png, then uncomment:
+
+    <figure>
+      <div class="frame">
+        <video src="demo.mp4" poster="poster.png" autoplay muted loop playsinline></video>
+      </div>
+      <figcaption>A real booking at 1&times; speed. No cuts, no sped-up frames.</figcaption>
+    </figure>
+    -->
+
+    <span class="label">Measured</span>
+    <div class="metrics">
+      <div class="metric"><span class="v">12.88s</span><span class="k">End to end</span></div>
+      <div class="metric"><span class="v">4.02s</span><span class="k">Agent thinking</span></div>
+      <div class="metric"><span class="v">~150ms</span><span class="k">Route, 6 questions</span></div>
+      <div class="metric"><span class="v">9/9</span><span class="k">Steps completed</span></div>
+    </div>
+    <p class="muted" style="font-size:14px">
+      PDX to DEN, two adults, one way. Jev chose a $268 fare and the run stopped on Frontier's passenger
+      details page.
+    </p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <span class="label">The idea</span>
+    <h2 style="margin-top:12px">Ask each layer only what it can be right about</h2>
+    <p>
+      Most browser agents are slow for one reason: the model talks to itself. It proposes an action, the
+      harness validates it, the action was malformed or pointed at an element that isn't on the page, so it
+      asks again. That loop is where the seconds go, and no amount of prompt tuning removes it, because the
+      model is being asked to be right about something it cannot reliably be right about.
+    </p>
+
+    <div class="layers">
+      <div class="layer hi">
+        <div class="who">Jev</div>
+        <div>
+          <p><strong>Decide.</strong> Bounded choices over a known option set.</p>
+          <p>Six heads in one request: which tool, what the traveller is optimising for, whether the sentence
+          carries enough to act on, the date, the party size, and one way against round trip.</p>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="who">LLM</div>
+        <div>
+          <p><strong>Write.</strong> The one job Jev cannot do.</p>
+          <p>"Portland" becomes PDX. "March 3" becomes a date. Open-ended string production, nothing else.</p>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="who">Code</div>
+        <div>
+          <p><strong>Act.</strong> Navigate, type, scroll, click.</p>
+          <p>Driven over the Chrome DevTools Protocol. This was never a model's job.</p>
+        </div>
+      </div>
+      <div class="layer hi">
+        <div class="who">Jev</div>
+        <div>
+          <p><strong>Decide again.</strong> One choice over the fare table, read as numbers.</p>
+          <p>Twelve options with a price, a duration and a stop count, against a stated priority.</p>
+        </div>
+      </div>
+    </div>
+
+    <p>
+      Nothing retries on malformed output, because nothing is asked to produce output it could get wrong.
+      That is the whole speed argument.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <span class="label">Where the time goes</span>
+    <h2 style="margin-top:12px">Four seconds of thinking inside a thirteen second booking</h2>
+
+    <div class="bar" role="img" aria-label="Of 12.88 seconds total, 2.23 seconds was Jev, 1.79 seconds was the text model, and 8.86 seconds was waiting for web pages to load.">
+      <span class="seg-jev"  style="flex:2.23">2.23s</span>
+      <span class="seg-llm"  style="flex:1.79">1.79s</span>
+      <span class="seg-wait" style="flex:8.86">8.86s</span>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>16 Jev calls</span>
+      <span><i style="background:#57575F"></i>3 model calls</span>
+      <span><i style="background:var(--surface);border:1px solid var(--border)"></i>Waiting on the web</span>
+    </div>
+
+    <p style="margin-top:24px">
+      The last segment is the honest one. Two thirds of the clock is Google and the airline painting their
+      own pages, which no agent controls. Wall clock across runs swings between 11.6 and 19.4 seconds for
+      that reason alone. The part Agent One is responsible for is the four seconds of decisions, and warm
+      those run at 133 to 200&nbsp;ms for routing.
+    </p>
+
+    <table>
+      <thead>
+        <tr><th>Run</th><th>Outcome</th><th>Time</th><th>Steps</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>PDX &rarr; SEA, 1 adult</td><td>Jev picked $132 from 12 fares</td><td class="n">11.59 s</td><td class="n">9/9</td></tr>
+        <tr><td>PDX &rarr; DEN, 2 adults</td><td>Stopped on Frontier passenger info, $268</td><td class="n">12.88 s</td><td class="n">9/9</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <span class="label">The hard part</span>
+    <h2 style="margin-top:12px">Picking the cheapest fare is a shaped question, not a prompt trick</h2>
+    <p>
+      The obvious approach hands the model the whole page and asks it to click the best flight. On Google
+      Flights that fails, because the cheapest fare usually sits under <em>Other flights</em>, roughly a
+      thousand pixels below the fold. An honest answer to "which of these can I click right now" excludes
+      the row that wins.
+    </p>
+    <p>
+      So the harness reads the result rows itself and turns them into numbers, then hands Jev a short choice
+      over structured options:
+    </p>
+<pre>{"price_usd": 132, "total_minutes": 224, "stops": "1 stop",
+ "airline": "Alaska", "departs": "6:00 AM"}</pre>
+    <p>
+      Jev still decides which one wins. It is simply being asked something a decision model can be right
+      about. The code does the scrolling and the clicking.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <span class="label">Limits</span>
+    <h2 style="margin-top:12px">What it does not do</h2>
+    <ul>
+      <li><strong>It is one tool.</strong> The router holds <code>book_flight</code> and <code>unclear</code>.
+      The routing layer is shaped for more; only one is loaded today.</li>
+      <li><strong>The fragile part is the selectors, not the models.</strong> The fare reader parses a price
+      out of an aria-label. If Google changes that string, fare selection stops working. That is the opposite
+      of what people usually assume breaks.</li>
+      <li><strong>It stops at passenger details on purpose.</strong> Agent One carries a booking up to the
+      point where real personal data would be entered. It does not fill in names, it does not pay.</li>
+      <li><strong>You cannot clone and run it today.</strong> TypeSafe is early access, so there is no public
+      key. The code is readable; running it needs a key of your own.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Built by <a href="https://github.com/saikumardeepak1">Deepak Lukulapu</a> on top of
+    <a href="https://github.com/browser-use/jev-ultrafast">browser-use/jev-ultrafast</a>.
+    Decisions by <a href="https://typesafe.ai">TypeSafe Jev</a>. MIT.
+  </div>
+</footer>
+
+</body>
+</html>
