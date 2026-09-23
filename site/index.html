@@ -6,7 +6,7 @@
 <title>Agent One</title>
 <meta name="description" content="A browser agent that books a flight from one sentence. TypeSafe Jev makes every bounded decision, a small text model only writes strings, and code does the clicking." />
 <meta property="og:title" content="Agent One" />
-<meta property="og:description" content="Books a flight from one sentence in 12.88 seconds, of which 4 seconds is the agent thinking." />
+<meta property="og:description" content="Books a flight from one sentence in under 18 seconds, with every bounded decision made by TypeSafe Jev at a 204ms median." />
 <meta property="og:type" content="website" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -287,27 +287,27 @@
 
 <section>
   <div class="wrap">
-    <!-- Recording slot. Drop an Agent One run at site/demo.mp4 with a first-frame
-         poster at site/poster.png, then uncomment:
-
     <figure>
       <div class="frame">
-        <video src="demo.mp4" poster="poster.png" autoplay muted loop playsinline></video>
+        <video src="demo.mp4" poster="poster.png" autoplay muted loop playsinline controls></video>
       </div>
-      <figcaption>A real booking at 1&times; speed. No cuts, no sped-up frames.</figcaption>
+      <figcaption>
+        A real booking at 1&times; speed, trimmed at both ends and not otherwise cut.
+        Portland to Seattle, one adult, one way: Jev picked a $132 Alaska fare out of 12 and the run
+        stopped holding a seat on Alaska's own cart page.
+      </figcaption>
     </figure>
-    -->
 
     <span class="label">Measured</span>
     <div class="metrics">
-      <div class="metric"><span class="v">12.88s</span><span class="k">End to end</span></div>
-      <div class="metric"><span class="v">4.02s</span><span class="k">Agent thinking</span></div>
-      <div class="metric"><span class="v">~150ms</span><span class="k">Route, 6 questions</span></div>
-      <div class="metric"><span class="v">9/9</span><span class="k">Steps completed</span></div>
+      <div class="metric"><span class="v">17.61s</span><span class="k">End to end</span></div>
+      <div class="metric"><span class="v">15</span><span class="k">Jev decisions</span></div>
+      <div class="metric"><span class="v">204ms</span><span class="k">Median decision</span></div>
+      <div class="metric"><span class="v">$0.0044</span><span class="k">Total cost</span></div>
     </div>
     <p class="muted" style="font-size:14px">
-      PDX to DEN, two adults, one way. Jev chose a $268 fare and the run stopped on Frontier's passenger
-      details page.
+      The run in the video above: 12 browser actions, 15 Jev decisions, 4 calls to the text model,
+      finishing on a held Alaska seat at $131.20.
     </p>
   </div>
 </section>
@@ -366,6 +366,8 @@
   <div class="wrap">
     <span class="label">Where the time goes</span>
     <h2 style="margin-top:12px">Four seconds of thinking inside a thirteen second booking</h2>
+    <p class="muted" style="font-size:14px">From a separate instrumented run, Portland to Denver,
+    where the log drawer recorded every call.</p>
 
     <div class="bar" role="img" aria-label="Of 12.88 seconds total, 2.23 seconds was Jev, 1.79 seconds was the text model, and 8.86 seconds was waiting for web pages to load.">
       <span class="seg-jev"  style="flex:2.23">2.23s</span>
