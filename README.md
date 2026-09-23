@@ -129,9 +129,20 @@ TEXT_MODEL_REASONING=omit
 
 ### About the browser
 
-`run-agent.sh` starts Brave on a throwaway profile at `/tmp/brave-jev-profile` with remote debugging on port 9222. It does not touch your own browser profile, and remote debugging is never enabled on it.
+`run-agent.sh` starts Brave on a profile of its own at `~/Library/Application Support/AgentOneBrowser`, with remote debugging on port 9222. Your everyday profile is never touched and never has remote debugging enabled.
 
-One macOS quirk: while the demo is running, clicking Brave in the Dock may surface the blank throwaway profile, because macOS hands the Dock icon to whichever Brave started first. Your real profile is untouched. `./stop.sh` gives it back.
+That separation is not a preference, it is required. Brave refuses to start remote debugging on the default profile at all:
+
+```
+DevTools remote debugging requires a non-default data directory.
+Specify this using --user-data-dir.
+```
+
+The reason is that port 9222 has no authentication. Anything running on the machine that can reach it can drive the browser and read whatever that profile is signed into, which is why infostealer malware looks for it. On a throwaway profile there is nothing to take.
+
+**Sign in to that window once** and it keeps your session for every later run, so the agent gets as far as a logged-in traveller would. Click **OPEN THE BROWSER** in the UI to bring it up.
+
+One macOS quirk: while the demo is running, clicking Brave in the Dock may surface the agent's profile, because macOS hands the Dock icon to whichever Brave started first. Your real profile is untouched. `./stop.sh` gives it back.
 
 ---
 

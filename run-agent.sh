@@ -4,7 +4,10 @@
 set -euo pipefail
 PORT=9222
 APP_PORT="${AGENT_ONE_PORT:-8767}"
-PROFILE="${BRAVE_JEV_PROFILE:-/tmp/brave-jev-profile}"
+# A profile of its own, because Brave refuses remote debugging on the default one:
+# "DevTools remote debugging requires a non-default data directory." It lives in Application
+# Support rather than /tmp so signing in once actually sticks; /tmp is wiped on reboot.
+PROFILE="${AGENT_ONE_PROFILE:-$HOME/Library/Application Support/AgentOneBrowser}"
 BRAVE="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
 # Park the window past the right edge of the widest attached display.
 OFFSET="${BRAVE_OFFSCREEN:-6000}"
@@ -37,10 +40,11 @@ export BU_CDP_WS JEV_CDP_PORT=$PORT AGENT_ONE_PORT=$APP_PORT
 echo "Brave attached. Agent One on http://127.0.0.1:$APP_PORT"
 cat <<'NOTE'
 
-  Heads up: the demo runs Brave on a blank throwaway profile in /tmp, and macOS gives the Dock
+  Heads up: the demo drives its own Brave profile (AgentOneBrowser), and macOS gives the Dock
   icon to whichever Brave is already running. While this is up, clicking Brave in the Dock may
-  show you that empty profile rather than your own. Your real profile is untouched either way.
-  Get your own browser back with:  pkill -f brave-jev-profile
+  show you that profile rather than your own. Your real profile is untouched either way.
+  Sign in to that window once and it will remember you on every later run.
+  Get your own browser back with:  ./stop.sh
 
 NOTE
 
