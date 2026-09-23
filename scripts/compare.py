@@ -95,24 +95,46 @@ def run_once(decider, goal, budget):
 
 
 def summarise(rows):
+    """Report only what the runs support.
+
+    Wall clock is deliberately not compared across a completed run and a failed one. A run that
+    gave up at step four has no meaningful duration, and putting its number beside a finished run
+    would be measuring failure and calling it speed. Wall clock is therefore summarised over
+    completed runs only, and says so when a side has none.
+    """
     out = {}
     for decider in ("jev", "llm"):
         runs = [r for r in rows if r["decider"] == decider]
         if not runs:
             continue
         finished = [r for r in runs if r["reached_booking"]]
+        # Per-decision latency is comparable whether or not the run finished, because it measures
+        # one question and one answer. Throttling is already excluded from it.
+        latencies = [r["median_ms"] for r in runs if r["median_ms"]]
         out[decider] = {
             "runs": len(runs),
-            "reached_booking": len(finished),
-            "median_decision_ms": round(statistics.median(
-                [r["median_ms"] for r in runs if r["median_ms"]] or [0])),
-            "median_wall_s": round(statistics.median([r["wall_ms"] for r in runs]) / 1000, 2),
-            "total_extra_attempts": sum(r["extra_attempts"] for r in runs),
+            "completed": len(finished),
+            "median_decision_ms": round(statistics.median(latencies)) if latencies else None,
             "median_prompt_tokens": round(statistics.median(
                 [r["median_prompt_tokens"] for r in runs if r["median_prompt_tokens"]] or [0])),
+            "median_wall_s_completed_only": (
+                round(statistics.median([r["wall_excluding_throttle_ms"] for r in finished]) / 1000, 2)
+                if finished else "no completed runs"
+            ),
             "median_throttle_s": round(statistics.median([r["throttle_ms"] for r in runs]) / 1000, 2),
+            "total_extra_attempts": sum(r["extra_attempts"] for r in runs),
             "distinct_rejections": sorted({r.split(":")[0] for row in runs for r in row["rejected"]}),
         }
+
+    jev, llm = out.get("jev", {}), out.get("llm", {})
+    if jev and llm:
+        if not llm["completed"] or not jev["completed"]:
+            out["verdict"] = (
+                "Not a speed result. One side did not complete the task, so the durations are not "
+                "comparable. What the runs support is a completion rate and a per-decision latency."
+            )
+        else:
+            out["verdict"] = "Both sides completed; wall clock over completed runs is comparable."
     return out
 
 
@@ -134,9 +156,10 @@ def main():
             row = run_once(decider, goal, args.budget)
             rows.append(row)
             print(
-                f"  wall {row['wall_ms'] / 1000:.2f}s | {row['decisions']} decisions | "
-                f"median {row['median_ms']} ms | re-asks {row['extra_attempts']} | "
-                f"booking page {'yes' if row['reached_booking'] else 'no'}"
+                f"  completed {'yes' if row['reached_booking'] else 'NO '} | "
+                f"{row['decisions']} decisions | median decision {row['median_ms']} ms | "
+                f"net {row['wall_excluding_throttle_ms'] / 1000:.2f}s "
+                f"(+{row['throttle_ms'] / 1000:.0f}s rate limited) | re-asks {row['extra_attempts']}"
                 + (f" | {row['error']}" if row["error"] else ""),
                 flush=True,
             )
