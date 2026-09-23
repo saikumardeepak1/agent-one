@@ -66,7 +66,12 @@ def run_once(decider, goal, budget):
     attempts = [d.get("attempts", 1) for d in decisions]
     # Tokens per decision is the other half of the story: a text model has to be handed the whole
     # element table as prose every step, where Jev is handed structured criteria.
-    prompt_tokens = [d.get("usage", {}).get("prompt_tokens", 0) for d in decisions]
+    # TypeSafe reports input_tokens, OpenAI-compatible providers report prompt_tokens. Reading
+    # only one of them made Jev look like it used no tokens at all, which is not true.
+    prompt_tokens = [
+        d.get("usage", {}).get("prompt_tokens") or d.get("usage", {}).get("input_tokens") or 0
+        for d in decisions
+    ]
     rejected = [r for d in decisions for r in d.get("rejected", [])] + failed
     wall_ms = round((time.perf_counter() - started) * 1000)
     return {
