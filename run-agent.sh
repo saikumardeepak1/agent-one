@@ -48,4 +48,16 @@ cat <<'NOTE'
 
 NOTE
 
+# Open the app in the demo browser once the server answers, so what gets recorded is a blank
+# Brave with one tab rather than a window full of bookmarks, extensions and other tabs.
+(
+  for _ in $(seq 1 40); do
+    sleep 0.5
+    if curl -s --max-time 2 "http://127.0.0.1:$APP_PORT/" >/dev/null 2>&1; then
+      uv run --env-file .env python scripts/open_app_window.py
+      break
+    fi
+  done
+) &
+
 exec uv run --env-file .env python -m jev_ultrafast.harness

@@ -468,3 +468,59 @@ def test_an_unrelated_failure_is_not_swallowed_as_a_session_loss(monkeypatch):
     monkeypatch.setattr(driver, "cdp", Mock(side_effect=RuntimeError("Target closed")))
     with pytest.raises(RuntimeError, match="Target closed"):
         agent.call("Runtime.evaluate")
+
+
+def test_the_decider_swap_is_the_only_difference(monkeypatch):
+    """The comparison is only worth anything if nothing else changes between the two runs."""
+    from jev_ultrafast import baseline
+
+    monkeypatch.setenv("AGENT_ONE_DECIDER", "llm")
+    monkeypatch.setattr(baseline, "choose", Mock(return_value={"choice": "e1"}))
+    assert loop.choose(page(), "goal", []) == {"choice": "e1"}
+
+    monkeypatch.setenv("AGENT_ONE_DECIDER", "jev")
+    monkeypatch.setattr(model, "choose", Mock(return_value={"choice": "e2"}))
+    assert loop.choose(page(), "goal", []) == {"choice": "e2"}
+
+
+def test_baseline_gets_the_same_options_jev_does(monkeypatch):
+    """A rigged baseline proves nothing, so it is handed the identical element table and rules."""
+    from jev_ultrafast import baseline
+
+    monkeypatch.setenv("TEXT_MODEL_API_KEY", "test")
+    ask = Mock(return_value={"choices": [{"message": {"content": '{"operation":"CLICK","target":"2"}'}}]})
+    monkeypatch.setattr(baseline, "ask", ask)
+    result = baseline.choose(page(), "Search for something", [])
+
+    sent = json.loads(ask.call_args.args[0]["messages"][1]["content"])
+    jev_elements, jev_targets, _ = model.action_space(page()["actions"])
+    assert sent["elements"] == jev_elements
+    assert set(sent["targets"]["CLICK"]) == set(jev_targets["CLICK"])
+    assert result["operation"] == "CLICK" and result["attempts"] == 1
+
+
+def test_baseline_reasks_when_the_model_names_an_element_that_is_not_there(monkeypatch):
+    """This is the failure Jev cannot have, so it is counted rather than silently retried away."""
+    from jev_ultrafast import baseline
+
+    monkeypatch.setenv("TEXT_MODEL_API_KEY", "test")
+    replies = [
+        '{"operation":"CLICK","target":"99"}',   # no such element
+        "not json at all",
+        '{"operation":"CLICK","target":"2"}',
+    ]
+    monkeypatch.setattr(baseline, "ask", Mock(
+        side_effect=[{"choices": [{"message": {"content": r}}]} for r in replies]))
+    result = baseline.choose(page(), "Search for something", [])
+
+    assert result["attempts"] == 3
+    assert result["rejected"] == ["target not on the page: 99", "unparseable JSON"]
+
+
+def test_baseline_reports_no_confidence_it_did_not_have(monkeypatch):
+    from jev_ultrafast import baseline
+
+    monkeypatch.setenv("TEXT_MODEL_API_KEY", "test")
+    monkeypatch.setattr(baseline, "ask", Mock(
+        return_value={"choices": [{"message": {"content": '{"operation":"CLICK","target":"2"}'}}]}))
+    assert baseline.choose(page(), "Search", [])["confidence"] is None

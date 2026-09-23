@@ -1,12 +1,29 @@
 """The complete agent loop. Typed choices, observable state, bounded execution."""
 
 import base64
+import os
 import time
 from pathlib import Path
 
+from . import model
 from .browser import Browser, StalePage
-from .model import action_space, choose, field_context, field_text
+from .model import action_space, field_context, field_text
 from .questions import MAX_STEPS
+
+
+def choose(*args, **kwargs):
+    """Which decision maker runs this step.
+
+    The A/B comparison is only worth anything if nothing else differs, so the swap is a single
+    environment variable and every other line of this loop, the browser driver and the executor is
+    shared between the two. AGENT_ONE_DECIDER=llm routes to the text-model baseline; anything else
+    is Jev.
+    """
+    if os.environ.get("AGENT_ONE_DECIDER", "jev").lower() == "llm":
+        from . import baseline
+
+        return baseline.choose(*args, **kwargs)
+    return model.choose(*args, **kwargs)
 
 
 class Agent:

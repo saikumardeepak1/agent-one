@@ -1,0 +1,139 @@
+{
+  "task": "Find one-way flights from Portland to Seattle on October 14, 2026, for one adult in economy. After the flight results appear, select the flight with the lowest price. Stop when the booking options for that flight are visible. Never enter personal information or payment details.",
+  "runs": [
+    {
+      "decider": "jev",
+      "wall_ms": 9822,
+      "throttle_ms": 0,
+      "wall_excluding_throttle_ms": 9822,
+      "decisions": 16,
+      "median_ms": 448,
+      "total_decision_ms": 7562,
+      "median_prompt_tokens": 0,
+      "extra_attempts": 0,
+      "rejected": [],
+      "operations": [
+        "CLICK",
+        "CLICK",
+        "BLOCKED",
+        "TYPE_TEXT",
+        "CLICK",
+        "CLICK",
+        "CLICK",
+        "CLICK",
+        "TYPE_TEXT",
+        "CLICK",
+        "CLICK",
+        "TYPE_TEXT",
+        "CLICK",
+        "WAIT",
+        "CLICK",
+        "DONE"
+      ],
+      "reached_booking": true,
+      "error": null
+    },
+    {
+      "decider": "llm",
+      "wall_ms": 279207,
+      "throttle_ms": 265000,
+      "wall_excluding_throttle_ms": 14207,
+      "decisions": 10,
+      "median_ms": 612,
+      "total_decision_ms": 11913,
+      "median_prompt_tokens": 3210,
+      "extra_attempts": 1,
+      "rejected": [
+        "target not on the page: [25]"
+      ],
+      "operations": [
+        "CLICK",
+        "CLICK",
+        "BLOCKED",
+        "TYPE_TEXT",
+        "CLICK",
+        "CLICK",
+        "CLICK",
+        "CLICK",
+        "CLICK",
+        "CLICK"
+      ],
+      "reached_booking": false,
+      "error": "budget of 240.0s exhausted"
+    },
+    {
+      "decider": "jev",
+      "wall_ms": 7956,
+      "throttle_ms": 1000,
+      "wall_excluding_throttle_ms": 6956,
+      "decisions": 14,
+      "median_ms": 274,
+      "total_decision_ms": 3771,
+      "median_prompt_tokens": 0,
+      "extra_attempts": 0,
+      "rejected": [],
+      "operations": [
+        "CLICK",
+        "CLICK",
+        "BLOCKED",
+        "TYPE_TEXT",
+        "CLICK",
+        "CLICK",
+        "CLICK",
+        "CLICK",
+        "CLICK",
+        "TYPE_TEXT",
+        "CLICK",
+        "WAIT",
+        "CLICK",
+        "DONE"
+      ],
+      "reached_booking": true,
+      "error": null
+    },
+    {
+      "decider": "llm",
+      "wall_ms": 76749,
+      "throttle_ms": 73000,
+      "wall_excluding_throttle_ms": 3749,
+      "decisions": 4,
+      "median_ms": 534,
+      "total_decision_ms": 2223,
+      "median_prompt_tokens": 3086,
+      "extra_attempts": 0,
+      "rejected": [],
+      "operations": [
+        "CLICK",
+        "CLICK",
+        "TYPE_TEXT",
+        "BLOCKED"
+      ],
+      "reached_booking": false,
+      "error": "gave up: chose BLOCKED"
+    }
+  ],
+  "summary": {
+    "jev": {
+      "runs": 2,
+      "reached_booking": 2,
+      "median_decision_ms": 361,
+      "median_wall_s": 8.89,
+      "total_extra_attempts": 0,
+      "median_prompt_tokens": 0,
+      "median_throttle_s": 0.5,
+      "distinct_rejections": []
+    },
+    "llm": {
+      "runs": 2,
+      "reached_booking": 0,
+      "median_decision_ms": 573,
+      "median_wall_s": 177.98,
+      "total_extra_attempts": 1,
+      "median_prompt_tokens": 3148,
+      "median_throttle_s": 169.0,
+      "distinct_rejections": [
+        "target not on the page"
+      ]
+    }
+  }
+}

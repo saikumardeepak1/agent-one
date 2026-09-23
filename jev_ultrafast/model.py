@@ -25,22 +25,51 @@ def _retryable_generation(response):
         return False
 
 
-def post_json(url, key, body):
-    for attempt in range(3):
+# Seconds spent sleeping on provider throttling since the last reset. A rate limit is a property
+# of the account tier, not of the approach being measured, so the comparison subtracts it rather
+# than reporting a free-tier queue as if it were decision latency.
+THROTTLE_SECONDS = 0.0
+
+
+def reset_throttle():
+    global THROTTLE_SECONDS
+    spent, THROTTLE_SECONDS = THROTTLE_SECONDS, 0.0
+    return spent
+
+
+def _throttled_sleep(seconds):
+    global THROTTLE_SECONDS
+    THROTTLE_SECONDS += seconds
+    time.sleep(seconds)
+
+
+def retry_after(response, attempt):
+    """Honour the provider's own Retry-After when it sends one, and back off otherwise."""
+    header = response.headers.get("retry-after") or response.headers.get("x-ratelimit-reset-tokens")
+    if header:
+        try:
+            return min(float(str(header).rstrip("s")), 30.0)
+        except ValueError:
+            pass
+    return 0.5 * 2**attempt
+
+
+def post_json(url, key, body, attempts=5):
+    for attempt in range(attempts):
         try:
             response = CLIENT.post(url, json=body, headers={"Authorization": f"Bearer {key}"})
         except httpx.HTTPError:
             # A pooled connection the provider has already closed fails on first use, which is a
             # dead socket rather than a dead service. Retrying gets a new one; giving up here cost
             # a whole demo run.
-            if attempt < 2:
+            if attempt < attempts - 1:
                 time.sleep(0.25 * 2**attempt)
                 continue
             raise RuntimeError("Model connection failed; no action executed.") from None
-        if response.status_code in {429, 529, 503} and attempt < 2:
-            time.sleep(0.5 * 2**attempt)
+        if response.status_code in {429, 529, 503} and attempt < attempts - 1:
+            _throttled_sleep(retry_after(response, attempt))
             continue
-        if response.status_code == 400 and attempt < 2 and _retryable_generation(response):
+        if response.status_code == 400 and attempt < attempts - 1 and _retryable_generation(response):
             # The provider produced output that failed its own JSON check. That is a sampling
             # accident, not a bad request: the identical body succeeds on the next try. Measured
             # 2 failures in 4 calls before the reasoning budget was capped, so the retry stays
@@ -156,7 +185,7 @@ def choose(state, goal, history):
         },
         "questions": questions,
     }
-    started = time.perf_counter()
+    started, throttled = time.perf_counter(), THROTTLE_SECONDS
     result = post_json(SYSTEM_ONE, os.environ["TYPESAFE_API_KEY"], body)
     operation_answer = validate_choice(result["answers"].get("operation", {}), operations)
     operation = operation_answer["choice"]
