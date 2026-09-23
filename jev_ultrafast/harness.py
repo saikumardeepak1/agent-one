@@ -1,4 +1,4 @@
-"""Jev Flash: a one-tool agent harness. Type a sentence, watch it book the cheapest seat.
+"""Agent One: a one-tool agent harness. Type a sentence, watch it book the cheapest seat.
 
 The split is the point. A small text model reads the sentence into a typed itinerary, Jev chooses
 every operation and target after that, and code executes. The run stops at the passenger details
@@ -76,7 +76,7 @@ def blank_state(steps=None):
         "messages": [
             {
                 "role": "agent",
-                "text": "Jev Flash is ready. I book one thing: the cheapest one-way fare. "
+                "text": "Agent One is ready. I book one thing: the cheapest one-way fare. "
                 "Tell me where you are going and when.",
             }
         ],
@@ -265,7 +265,7 @@ def hide_browser(minimized=True):
         target = FEED.target_id
     if not target:
         # Nothing is being driven, so there is no window of ours to hide. The anchor window is
-        # left alone on purpose: Brave may have put the Jev Flash page in it, and minimising that
+        # left alone on purpose: Brave may have put the Agent One page in it, and minimising that
         # is how the app went blank.
         return
     try:
@@ -799,7 +799,7 @@ def main():
     STATE.update(blank_state())
     atexit.register(stop_all)
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Jev Flash: {ORIGIN}", flush=True)
+    print(f"Agent One: {ORIGIN}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

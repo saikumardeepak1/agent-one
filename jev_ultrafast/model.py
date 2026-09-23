@@ -13,6 +13,18 @@ CLIENT = httpx.Client(http2=True, timeout=25)
 SYSTEM_ONE = "https://api.typesafe.ai/v1/systemone"
 
 
+# A 400 normally means the request itself is wrong and retrying is pointless. These two codes are
+# the exception: the request was accepted and the model's own output failed validation.
+GENERATION_FAULTS = ("json_validate_failed", "output_parse_failed")
+
+
+def _retryable_generation(response):
+    try:
+        return response.json().get("error", {}).get("code") in GENERATION_FAULTS
+    except ValueError:
+        return False
+
+
 def post_json(url, key, body):
     for attempt in range(3):
         try:
@@ -27,6 +39,13 @@ def post_json(url, key, body):
             raise RuntimeError("Model connection failed; no action executed.") from None
         if response.status_code in {429, 529, 503} and attempt < 2:
             time.sleep(0.5 * 2**attempt)
+            continue
+        if response.status_code == 400 and attempt < 2 and _retryable_generation(response):
+            # The provider produced output that failed its own JSON check. That is a sampling
+            # accident, not a bad request: the identical body succeeds on the next try. Measured
+            # 2 failures in 4 calls before the reasoning budget was capped, so the retry stays
+            # as a backstop even now that the cause is fixed.
+            time.sleep(0.2 * 2**attempt)
             continue
         if response.is_error:
             detail = response.text[:220].replace("\n", " ")
@@ -185,12 +204,22 @@ def field_text(context):
         raise ValueError("TYPE_TEXT needs TEXT_MODEL_API_KEY; no text is hardcoded or guessed by the executor.")
     base = os.environ.get("TEXT_MODEL_BASE_URL", "https://api.deepseek.com/v1").rstrip("/")
     model = os.environ.get("TEXT_MODEL", "deepseek-chat")
-    reasoning = {"thinking": {"type": "disabled"}} if "api.deepseek.com/" in base else {"reasoning": {"effort": "low"}}
+    if "api.deepseek.com/" in base:
+        reasoning = {"thinking": {"type": "disabled"}}
+    elif "api.groq.com" in base:
+        # gpt-oss reasons before it answers, and at Groq's default effort that reasoning is
+        # unbounded: measured 103 to 291 completion tokens on the same field. On a full page
+        # payload it overruns max_tokens, the JSON arrives truncated, and Groq rejects the whole
+        # call as json_validate_failed. Low effort answers the same question in ~40 tokens.
+        # Groq names this field reasoning_effort, not the nested reasoning object others use.
+        reasoning = {"reasoning_effort": "low"}
+    else:
+        reasoning = {"reasoning": {"effort": "low"}}
     setting = os.environ.get("TEXT_MODEL_REASONING")
     if setting == "none":
         reasoning = {"reasoning": {"enabled": False}}
     elif setting == "omit":
-        # Groq and Gemini reject unknown request fields with a 400, so send no reasoning key at all.
+        # Some providers reject unknown request fields with a 400; send no reasoning key at all.
         reasoning = {}
     started = time.perf_counter()
     result = post_json(
@@ -198,7 +227,9 @@ def field_text(context):
         key,
         {
             "model": model,
-            "max_tokens": 1024,
+            # Headroom for a reasoning spike. The answer is a dozen tokens; the budget exists so a
+            # long think cannot truncate it into invalid JSON.
+            "max_tokens": 4096,
             "response_format": {"type": "json_object"},
             **reasoning,
             "messages": [

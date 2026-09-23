@@ -324,3 +324,53 @@ def test_navigation_during_prediction_reobserves_without_action(runner):
     assert runner.state["status"] == "ready"
     assert runner.state["decision"] is None
     runner.state["browser"].act.assert_not_called()
+
+
+def test_groq_caps_reasoning_so_json_cannot_be_truncated(monkeypatch):
+    """gpt-oss reasons before it answers. Uncapped, that reasoning ran past max_tokens and Groq
+    rejected the truncated JSON as json_validate_failed. Groq spells the cap reasoning_effort."""
+    monkeypatch.setenv("TEXT_MODEL_API_KEY", "test")
+    monkeypatch.setenv("TEXT_MODEL_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.delenv("TEXT_MODEL_REASONING", raising=False)
+    post = Mock(return_value={"choices": [{"message": {"content": '{"text":"Portland"}'}}]})
+    monkeypatch.setattr(model, "post_json", post)
+    model.field_text({"goal": "Fly from Portland"})
+    sent = post.call_args.args[2]
+    assert sent["reasoning_effort"] == "low"
+    assert "reasoning" not in sent
+    assert sent["max_tokens"] >= 4096
+
+
+def test_reasoning_override_still_wins_over_the_provider_default(monkeypatch):
+    monkeypatch.setenv("TEXT_MODEL_API_KEY", "test")
+    monkeypatch.setenv("TEXT_MODEL_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.setenv("TEXT_MODEL_REASONING", "omit")
+    post = Mock(return_value={"choices": [{"message": {"content": '{"text":"Portland"}'}}]})
+    monkeypatch.setattr(model, "post_json", post)
+    model.field_text({"goal": "Fly from Portland"})
+    sent = post.call_args.args[2]
+    assert "reasoning_effort" not in sent and "reasoning" not in sent
+
+
+@pytest.mark.parametrize("code", ["json_validate_failed", "output_parse_failed"])
+def test_a_failed_generation_is_retried_not_surfaced(monkeypatch, code):
+    """A 400 usually means the request is wrong, so retrying is pointless. These two codes mean the
+    request was fine and the model's own output failed validation, which the next sample fixes."""
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+    bad = Mock(status_code=400, is_error=True, json=Mock(return_value={"error": {"code": code}}))
+    good = Mock(status_code=200, is_error=False, json=Mock(return_value={"ok": True}))
+    client = Mock(post=Mock(side_effect=[bad, good]))
+    monkeypatch.setattr(model, "CLIENT", client)
+    assert model.post_json("https://api.test/v1", "key", {}) == {"ok": True}
+    assert client.post.call_count == 2
+
+
+def test_an_ordinary_bad_request_is_not_retried(monkeypatch):
+    monkeypatch.setattr(time, "sleep", lambda *_: None)
+    bad = Mock(status_code=400, is_error=True, text="model not found",
+               json=Mock(return_value={"error": {"code": "model_not_found"}}))
+    client = Mock(post=Mock(return_value=bad))
+    monkeypatch.setattr(model, "CLIENT", client)
+    with pytest.raises(RuntimeError, match="HTTP 400"):
+        model.post_json("https://api.test/v1", "key", {})
+    assert client.post.call_count == 1
