@@ -165,6 +165,8 @@ main {
 
 h1 {
   margin: 0 0 6px;
+  /* Reserve the line while it is empty, so nothing shifts when the route lands. */
+  min-height: 1lh;
   font-size: clamp(26px, 2.9vw, 40px);
   font-weight: 500;
   line-height: 0.84;

@@ -86,7 +86,9 @@ function renderRail() {
 function renderHeadline() {
   const trip = state.itinerary;
   if (!trip) {
-    $("headline").innerHTML = "One sentence.<br />One seat.";
+    // Empty until there is a real trip to name. The h1 keeps its line box either way, so the
+    // route appears in place instead of pushing the page down mid-run.
+    $("headline").textContent = "";
     return;
   }
   const seconds = (state.elapsed_ms / 1000).toFixed(2);
