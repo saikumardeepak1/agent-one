@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -17,6 +18,13 @@ MARKER = f"(() => {{ const state={READ_STATE}; return state?.marker ?? null; }})
 
 class StalePage(ValueError):
     """A decision no longer refers to the observed page."""
+
+
+# CDP -32001. The session is bound to one target, and a handoff can take that target away:
+# "Continue to book" can navigate cross-origin in place, which swaps the target out from under us.
+# Every later call then failed with this forever, because nothing re-attached, and the run died on
+# the last step with the fare already chosen.
+SESSION_LOST = "Session with given id not found"
 
 
 class Browser:
@@ -46,8 +54,49 @@ class Browser:
         self.call("Emulation.setFocusEmulationEnabled", enabled=True)
         self.after_input = None
 
+    def _recover_session(self):
+        """Re-attach after the session is dropped, so a handoff cannot end the run.
+
+        Re-attaching to the same target covers the usual case, where the session went but the tab
+        is still there. If the target itself is gone, adopt whichever page is live instead, never
+        the Agent One page, which is the one tab that must not be driven or minimised.
+        """
+        if getattr(self, "_recovering", False):
+            return False
+        self._recovering = True
+        try:
+            try:
+                self.session = cdp("Target.attachToTarget", targetId=self.target, flatten=True)["sessionId"]
+                return True
+            except Exception:
+                pass
+            try:
+                targets = cdp("Target.getTargets")["targetInfos"]
+            except Exception:
+                return False
+            app = f":{os.environ.get('AGENT_ONE_PORT', '8767')}/"
+            live = [
+                t for t in targets
+                if t.get("type") == "page" and app not in t.get("url", "")
+                and not t.get("url", "").startswith(("devtools://", "chrome://"))
+            ]
+            if not live:
+                return False
+            self.adopt(live[-1]["targetId"])
+            return True
+        finally:
+            self._recovering = False
+
+    def _retry_if_session_lost(self, run):
+        try:
+            return run()
+        except Exception as error:
+            if SESSION_LOST not in str(error) or not self._recover_session():
+                raise
+            return run()
+
     def call(self, method, **params):
-        return cdp(method, session_id=self.session, **params)
+        return self._retry_if_session_lost(lambda: cdp(method, session_id=self.session, **params))
 
     def evaluate(self, expression):
         response = self.call("Runtime.evaluate", expression=expression, returnByValue=True)
@@ -90,8 +139,10 @@ class Browser:
                 pass
         for attempt in range(10):
             try:
-                return browser_operation(
-                    {"operation": "observe", "session": self.session, "screenshot": screenshot}
+                return self._retry_if_session_lost(
+                    lambda: browser_operation(
+                        {"operation": "observe", "session": self.session, "screenshot": screenshot}
+                    )
                 )
             except StalePage:
                 if attempt == 9:
@@ -116,7 +167,11 @@ class Browser:
             raise StalePage("Page changed since this decision. Observe again.")
         if action["kind"] == "wait":
             time.sleep(0.1)
-        result = browser_operation({"operation": "act", "session": self.session, "action": action, "text": text})
+        result = self._retry_if_session_lost(
+            lambda: browser_operation(
+                {"operation": "act", "session": self.session, "action": action, "text": text}
+            )
+        )
         self.after_input = action if action["kind"] != "wait" else None
         return result
 

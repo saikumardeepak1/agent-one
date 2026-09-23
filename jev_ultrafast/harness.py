@@ -570,7 +570,12 @@ def drive_booking(trip):
     # The agent stops the moment it arrives; the page finishes painting a beat later.
     deadline = time.perf_counter() + (0 if handoff or STATE.get("stopped") else 6)
     while time.perf_counter() < deadline:
-        page = AGENT.browser.observe(screenshot=False)
+        # Only waiting for the page to finish painting. The booking is already done by this point,
+        # so a read that fails here must not turn a finished run into an error on screen.
+        try:
+            page = AGENT.browser.observe(screenshot=False)
+        except Exception:
+            break
         with LOCK:
             read_progress(page, trip)
             done = next(s for s in STATE["steps"] if s["id"] == "details")["status"] == "done"

@@ -407,3 +407,64 @@ def test_both_text_calls_agree_on_reasoning(monkeypatch):
     reasoning_keys = lambda body: {k: v for k, v in body.items() if "reason" in k or "think" in k}
     assert reasoning_keys(field_call) == reasoning_keys(intent_call) == {"reasoning_effort": "low"}
     assert field_call["max_tokens"] >= 4096 and intent_call["max_tokens"] >= 4096
+
+
+def test_a_dropped_session_reattaches_instead_of_ending_the_run(monkeypatch):
+    """Google's "Continue to book" can navigate cross-origin in place, which swaps the target out.
+    The session was attached once and never again, so every later call returned -32001 forever and
+    the run died on the last step with the fare already chosen."""
+    from jev_ultrafast import browser as driver
+
+    agent = driver.Browser.__new__(driver.Browser)
+    agent.target, agent.session = "T1", "dead"
+    calls = []
+
+    def cdp(method, session_id=None, **params):
+        calls.append(method)
+        if method == "Target.attachToTarget":
+            return {"sessionId": "fresh"}
+        if session_id == "dead":
+            raise RuntimeError("{'code': -32001, 'message': 'Session with given id not found.'}")
+        return {"ok": True}
+
+    monkeypatch.setattr(driver, "cdp", cdp)
+    assert agent.call("Runtime.evaluate") == {"ok": True}
+    assert agent.session == "fresh"
+    assert calls.count("Target.attachToTarget") == 1
+
+
+def test_recovery_adopts_a_live_page_when_the_target_is_gone(monkeypatch):
+    from jev_ultrafast import browser as driver
+
+    agent = driver.Browser.__new__(driver.Browser)
+    agent.target, agent.session = "GONE", "dead"
+
+    def cdp(method, session_id=None, targetId=None, **params):
+        if method == "Target.attachToTarget":
+            if targetId == "GONE":
+                raise RuntimeError("No target with given id found")
+            return {"sessionId": "adopted"}
+        if method == "Target.getTargets":
+            return {"targetInfos": [
+                {"type": "page", "targetId": "APP", "url": "http://127.0.0.1:8767/"},
+                {"type": "page", "targetId": "AIRLINE", "url": "https://www.united.com/booking"},
+            ]}
+        if session_id == "dead":
+            raise RuntimeError("{'code': -32001, 'message': 'Session with given id not found.'}")
+        return {"ok": True}
+
+    monkeypatch.setattr(driver, "cdp", cdp)
+    monkeypatch.setenv("AGENT_ONE_PORT", "8767")
+    assert agent.call("Runtime.evaluate") == {"ok": True}
+    # Never the Agent One page: driving or minimising that one is the bug this guards.
+    assert agent.target == "AIRLINE"
+
+
+def test_an_unrelated_failure_is_not_swallowed_as_a_session_loss(monkeypatch):
+    from jev_ultrafast import browser as driver
+
+    agent = driver.Browser.__new__(driver.Browser)
+    agent.target, agent.session = "T1", "live"
+    monkeypatch.setattr(driver, "cdp", Mock(side_effect=RuntimeError("Target closed")))
+    with pytest.raises(RuntimeError, match="Target closed"):
+        agent.call("Runtime.evaluate")
