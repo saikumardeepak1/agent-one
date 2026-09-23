@@ -189,6 +189,30 @@ def choose(state, goal, history):
     }
 
 
+def reasoning_options(base):
+    """How to tell this provider not to think for long, in the spelling it accepts.
+
+    Every provider names this differently and rejects the others outright, so it is decided in one
+    place. Groq uses a flat reasoning_effort and 400s on a nested reasoning object; DeepSeek uses
+    thinking; the OpenAI-compatible default is a nested reasoning object. TEXT_MODEL_REASONING
+    overrides all of it, with "omit" sending no key at all.
+    """
+    setting = os.environ.get("TEXT_MODEL_REASONING")
+    if setting == "omit":
+        return {}
+    if setting == "none":
+        return {"reasoning": {"enabled": False}}
+    if "api.deepseek.com/" in base:
+        return {"thinking": {"type": "disabled"}}
+    if "api.groq.com" in base:
+        # gpt-oss reasons before it answers, and Groq's default effort leaves that unbounded:
+        # measured 103 to 291 completion tokens for the same one-word field. On a full page
+        # payload it overran max_tokens, the JSON arrived truncated, and Groq rejected the call
+        # as json_validate_failed. Low effort answers the same question in under 40 tokens.
+        return {"reasoning_effort": "low"}
+    return {"reasoning": {"effort": "low"}}
+
+
 def field_context(goal, action, page, history):
     return {
         "goal": goal,
@@ -204,23 +228,7 @@ def field_text(context):
         raise ValueError("TYPE_TEXT needs TEXT_MODEL_API_KEY; no text is hardcoded or guessed by the executor.")
     base = os.environ.get("TEXT_MODEL_BASE_URL", "https://api.deepseek.com/v1").rstrip("/")
     model = os.environ.get("TEXT_MODEL", "deepseek-chat")
-    if "api.deepseek.com/" in base:
-        reasoning = {"thinking": {"type": "disabled"}}
-    elif "api.groq.com" in base:
-        # gpt-oss reasons before it answers, and at Groq's default effort that reasoning is
-        # unbounded: measured 103 to 291 completion tokens on the same field. On a full page
-        # payload it overruns max_tokens, the JSON arrives truncated, and Groq rejects the whole
-        # call as json_validate_failed. Low effort answers the same question in ~40 tokens.
-        # Groq names this field reasoning_effort, not the nested reasoning object others use.
-        reasoning = {"reasoning_effort": "low"}
-    else:
-        reasoning = {"reasoning": {"effort": "low"}}
-    setting = os.environ.get("TEXT_MODEL_REASONING")
-    if setting == "none":
-        reasoning = {"reasoning": {"enabled": False}}
-    elif setting == "omit":
-        # Some providers reject unknown request fields with a 400; send no reasoning key at all.
-        reasoning = {}
+    reasoning = reasoning_options(base)
     started = time.perf_counter()
     result = post_json(
         base + "/chat/completions",

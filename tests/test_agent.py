@@ -374,3 +374,36 @@ def test_an_ordinary_bad_request_is_not_retried(monkeypatch):
     with pytest.raises(RuntimeError, match="HTTP 400"):
         model.post_json("https://api.test/v1", "key", {})
     assert client.post.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "base,expected",
+    [
+        ("https://api.groq.com/openai/v1", {"reasoning_effort": "low"}),
+        ("https://api.deepseek.com/v1", {"thinking": {"type": "disabled"}}),
+        ("https://openrouter.ai/api/v1", {"reasoning": {"effort": "low"}}),
+    ],
+)
+def test_each_provider_gets_the_spelling_it_accepts(monkeypatch, base, expected):
+    monkeypatch.delenv("TEXT_MODEL_REASONING", raising=False)
+    assert model.reasoning_options(base) == expected
+
+
+def test_both_text_calls_agree_on_reasoning(monkeypatch):
+    """The router and the field helper are separate calls to the same provider. They each used to
+    decide this alone, and they drifted: one sent Groq's reasoning_effort while the other sent a
+    nested reasoning object that Groq rejects outright as unsupported."""
+    from jev_ultrafast import harness
+
+    monkeypatch.setenv("TEXT_MODEL_API_KEY", "test")
+    monkeypatch.setenv("TEXT_MODEL_BASE_URL", "https://api.groq.com/openai/v1")
+    monkeypatch.delenv("TEXT_MODEL_REASONING", raising=False)
+    post = Mock(return_value={"choices": [{"message": {"content": '{"text":"Portland"}'}}]})
+    monkeypatch.setattr(model, "post_json", post)
+    model.field_text({"goal": "Fly from Portland"})
+    field_call = post.call_args.args[2]
+    intent_call = harness.intent_body("fly from Portland", "2026-09-22")
+
+    reasoning_keys = lambda body: {k: v for k, v in body.items() if "reason" in k or "think" in k}
+    assert reasoning_keys(field_call) == reasoning_keys(intent_call) == {"reasoning_effort": "low"}
+    assert field_call["max_tokens"] >= 4096 and intent_call["max_tokens"] >= 4096

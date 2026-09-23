@@ -134,12 +134,14 @@ def parse_intent(command, need_date=True):
 
 
 def intent_body(command, today):
-    reasoning = {} if os.environ.get("TEXT_MODEL_REASONING") == "omit" else {"reasoning": {"enabled": False}}
+    base = os.environ.get("TEXT_MODEL_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
     return {
         "model": os.environ.get("TEXT_MODEL", "openai/gpt-oss-20b"),
-        "max_tokens": 400,
+        # Headroom for a reasoning spike. The answer is a short object; the budget exists only so
+        # a long think cannot truncate it into JSON the provider then rejects.
+        "max_tokens": 4096,
         "response_format": {"type": "json_object"},
-        **reasoning,
+        **model.reasoning_options(base),
         "messages": [
             {"role": "system", "content": INTENT},
             {"role": "user", "content": json.dumps({"today": today, "request": command})},
